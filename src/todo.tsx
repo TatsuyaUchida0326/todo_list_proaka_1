@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 
-
 // "Todo" 型の定義をコンポーネント外で行います
 type Todo = {
-  content: string; // プロパティ content は文字列型
+  content: string;
   readonly id: number;
+  completed_flg: boolean;
+  delete_flg: boolean, // <-- 追加
 };
 
 
@@ -14,19 +15,19 @@ const Todo: React.FC = () => {
   const [text, setText] = useState(''); // フォーム入力のためのステート
   const [nextId, setNextId] = useState(1); // 次のTodoのIDを保持するステート
 
-
   // todos ステートを更新する関数
   const handleSubmit = () => {
     // 何も入力されていなかったらリターン
     if (!text) return;
 
-
     // 新しい Todo を作成
     const newTodo: Todo = {
       content: text, // text ステートの値を content プロパティへ
       id: nextId,
+      // 初期値は false
+      completed_flg: false,
+      delete_flg: false, // <-- 追加
     };
-
 
     /**
      * 更新前の todos ステートを元に
@@ -41,6 +42,7 @@ const Todo: React.FC = () => {
     setText('');
   };
 
+
   const handleEdit = (id: number, value: string) => {
     setTodos((todos) => {
       const newTodos = todos.map((todo) => {
@@ -50,7 +52,6 @@ const Todo: React.FC = () => {
         }
         return todo;
       });
-  
   
       // todos ステートが書き換えられていないかチェック
       console.log('=== Original todos ===');
@@ -62,6 +63,37 @@ const Todo: React.FC = () => {
       return newTodos;
     });
   };
+
+
+  const handleCheck = (id: number, completed_flg: boolean) => {
+    setTodos((todos) => {
+      const newTodos = todos.map((todo) => {
+        if (todo.id === id) {
+          return { ...todo, completed_flg };
+        }
+        return todo;
+      });
+
+
+      return newTodos;
+    });
+  };
+
+
+  const handleRemove = (id: number, delete_flg: boolean) => {
+    setTodos((todos) => {
+      const newTodos = todos.map((todo) => {
+        if (todo.id === id) {
+          return { ...todo, delete_flg };
+        }
+        return todo;
+      });
+
+
+      return newTodos;
+    });
+  };
+
 
   return (
     <div>
@@ -76,17 +108,27 @@ const Todo: React.FC = () => {
           value={text} // フォームの入力値をステートにバインド
           onChange={(e) => setText(e.target.value)} // 入力値が変わった時にステートを更新
         />
-        <input type="submit" content="追加" /> {/* ボタンをクリックしてもonSubmitをトリガーしない */}
+        <button type="submit">追加</button> {/* ボタンをクリックしてもonSubmitをトリガーしない */}
       </form>
       <ul>
         {todos.map((todo) => {
           return (
             <li key={todo.id}>
               <input
+                type="checkbox"
+                checked={todo.completed_flg}
+                // 呼び出し側で checked フラグを反転させる
+                onChange={() => handleCheck(todo.id, !todo.completed_flg)}
+              />
+              <input
                 type="text"
                 value={todo.content}
+                disabled={todo.completed_flg}
                 onChange={(e) => handleEdit(todo.id, e.target.value)}
               />
+              <button onClick={() => handleRemove(todo.id, !todo.delete_flg)}>
+                {todo.delete_flg ? '復元' : '削除'}
+              </button>
             </li>
           );
         })}
@@ -94,5 +136,7 @@ const Todo: React.FC = () => {
     </div>
   );
 };
+
+
 
 export default Todo;
