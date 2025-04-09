@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import localforage from 'localforage';
-
 
 
 // "Todo" 型の定義をコンポーネント外で行います
@@ -25,29 +23,17 @@ const Todo: React.FC = () => {
 
 
 
+  // コンポーネントマウント時にRails APIからデータを取得
   useEffect(() => {
-    // ここに副作用の処理を書く
-    console.log('TODO!');
-  }, []);
-
-
-  // const updateTodo = <T extends keyof Todo>(todos: Todo[], id: number, key: T, value: Todo[T]): Todo[] => {
-  //   return todos.map((todo) => {
-  //     if (todo.id === id) {
-  //       return { ...todo, [key]: value };
-  //     }
-  //     return todo;
-  //   });
-  // };
-  
+    fetch("http://localhost:3031/api/v1/todos")
+      .then(response => response.json())
+      .then(data => setTodos(data));
+  }, []);  
 
 
   // todos ステートを更新する関数
   const handleSubmit = () => {
     if (!text) return;
-
-
-
     const newTodo: Todo = {
       content: text,
       id: nextId,
@@ -56,12 +42,23 @@ const Todo: React.FC = () => {
     };
 
 
-
     setTodos((prevTodos) => [newTodo, ...prevTodos]);
+
+    // Rails APIに新しいTodoを送信し、レスポンスをステートに追加する
+    fetch("http://localhost:3031/api/v1/todos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(newTodo),
+    })
+      .then(response => response.json())
+      .then(data => setTodos([data, ...todos]));
+
+
     setNextId(nextId + 1);
     setText('');
   };
-
 
 
   // フィルタリングされたタスクリストを取得する関数
@@ -129,24 +126,6 @@ const Todo: React.FC = () => {
    const handleEmpty = () => {
     setTodos((todos) => todos.filter((todo) => !todo.delete_flg));
   };
-
-
-  // useEffect フックを使ってコンポーネントのマウント時にデータを取得
-  useEffect(() => {
-    localforage.getItem('todo-20240622').then((values) => {
-      if (values) {
-        setTodos(values as Todo[]);
-      }
-    });
-  }, []);
-
-
-
-  // useEffect フックを使って todos ステートが更新されるたびにデータを保存
-  useEffect(() => {
-    localforage.setItem('todo-20240622', todos);
-  }, [todos]);
-
 
 
  return (
