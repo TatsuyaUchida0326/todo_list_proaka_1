@@ -1,10 +1,9 @@
-import { Todo } from './todo';
+import type { Todo } from './types';
 
 export const fetchTodos = async (): Promise<Todo[]> => {
   const response = await fetch("http://localhost:3031/api/v1/todos");
   return response.json();
 };
-
 
 export const createTodo = async (todo: Omit<Todo, 'id'>): Promise<Todo> => {
   const response = await fetch("http://localhost:3031/api/v1/todos", {
@@ -17,18 +16,15 @@ export const createTodo = async (todo: Omit<Todo, 'id'>): Promise<Todo> => {
   return response.json();
 };
 
-
-export const updateTodo = async (id: number, updatedTodo: Partial<Todo>): Promise<Todo> => {
-  const response = await fetch(`http://localhost:3031/api/v1/todos/${id}`, {
+export const updateTodo = async (id: number, updatedTodo: Partial<Todo>): Promise<Response> => {
+  return fetch(`http://localhost:3031/api/v1/todos/${id}`, {
     method: "PATCH",
     headers: {
-    "Content-Type": "application/json",
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(updatedTodo),
   });
-  return response.json();
 };
-
 
 export const deleteTodo = async (id: number): Promise<void> => {
   await fetch(`http://localhost:3031/api/v1/todos/${id}`, {
