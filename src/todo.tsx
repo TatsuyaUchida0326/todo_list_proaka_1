@@ -1,134 +1,90 @@
 import React, { useState, useEffect } from 'react';
+import { fetchTodos, createTodo, updateTodo, deleteTodo } from './api';
 
-
-// "Todo" 型の定義をコンポーネント外で行います
-type Todo = {
+export interface Todo {
   content: string;
   readonly id: number;
   completed_flg: boolean;
   delete_flg: boolean;
-};
-
-
+}
 
 type Filter = 'all' | 'completed' | 'unchecked' | 'delete';
 
-
-// Todo コンポーネントの定義
 const Todo: React.FC = () => {
-  const [todos, setTodos] = useState<Todo[]>([]); // Todoの配列を保持するステート
-  const [text, setText] = useState(''); // フォーム入力のためのステート
-  const [nextId, setNextId] = useState(1); // 次のTodoのIDを保持するステート
-  const [filter, setFilter] = useState<Filter>('all'); // フィルタのステート
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [text, setText] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
 
+  const isFormDisabled = filter === 'completed' || filter === 'delete';
 
-
-  // コンポーネントマウント時にRails APIからデータを取得
+  // 初回マウント時にTodo一覧をAPIから取得
   useEffect(() => {
-    fetch("http://localhost:3031/api/v1/todos")
-      .then(response => response.json())
-      .then(data => setTodos(data));
-  }, []);  
+    fetchTodos().then(data => setTodos(data));
+  }, []);
 
-
-  // todos ステートを更新する関数
+  // 新しいTodoを作成する
   const handleSubmit = () => {
     if (!text) return;
-    const newTodo: Todo = {
+
+    const newTodo: Omit<Todo, 'id'> = {
       content: text,
-      id: nextId,
       completed_flg: false,
       delete_flg: false,
     };
 
-
-    setTodos((prevTodos) => [newTodo, ...prevTodos]);
-
-    // Rails APIに新しいTodoを送信し、レスポンスをステートに追加する
-    fetch("http://localhost:3031/api/v1/todos", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(newTodo),
-    })
-      .then(response => response.json())
-      .then(data => setTodos([data, ...todos]));
-
-
-    setNextId(nextId + 1);
-    setText('');
+    createTodo(newTodo).then(data => {
+      setTodos((prevTodos) => [data, ...prevTodos]);
+      setText('');
+    });
   };
 
-
-  // フィルタリングされたタスクリストを取得する関数
-  const getFilteredTodos = () => {
-    switch (filter) {
-      case 'completed':
-        // 完了済み **かつ** 削除されていないタスクを返す
-        return todos.filter((todo) => todo.completed_flg && !todo.delete_flg);
-      case 'unchecked':
-        // 未完了 **かつ** 削除されていないタスクを返す
-        return todos.filter((todo) => !todo.completed_flg && !todo.delete_flg);
-      case 'delete':
-        // 削除されたタスクを返す
-        return todos.filter((todo) => todo.delete_flg);
-      default:
-        // 削除されていないすべてのタスクを返す
-        return todos.filter((todo) => !todo.delete_flg);
-    }
-  };
-
-
-
-  // 共通の更新関数を使用したイベント処理関数
-  // const handleEdit = (id: number, value: string) => {
-  //   setTodos((todos) => updateTodo(todos, id, 'content', value));
-  // };
-
-
-  // const handleCheck = (id: number, completed_flg: boolean) => {
-  //   setTodos((todos) => updateTodo(todos, id, 'completed_flg', completed_flg));
-  // };
-
-
-  // const handleRemove = (id: number, delete_flg: boolean) => {
-  //   setTodos((todos) => updateTodo(todos, id, 'delete_flg', delete_flg));
-  // };
-
-
-  const handleFilterChange = (filter: Filter) => {
-    setFilter(filter);
-  };
-
-
-
+  // Todoの特定のプロパティを更新（編集・完了・削除）
   const handleTodo = <K extends keyof Todo, V extends Todo[K]>(
     id: number,
     key: K,
     value: V
   ) => {
-    setTodos((todos) => {
-      const newTodos = todos.map((todo) => {
-        if (todo.id === id) {
-          return { ...todo, [key]: value };
-        } else {
-          return todo;
-        }
-      });
-  
-      return newTodos;
-    });
+    const updatedTodos = todos.map(todo =>
+      todo.id === id ? { ...todo, [key]: value } : todo
+    );
+
+    setTodos(updatedTodos);
+
+    const todo = updatedTodos.find(todo => todo.id === id);
+    if (todo) {
+      updateTodo(id, todo);
+    }
   };
 
+  // 削除済みのTodoを物理削除
+  const handleEmpty = () => {
+    const filteredTodos = todos.filter(todo => !todo.delete_flg);
+    const deletePromises = todos
+      .filter(todo => todo.delete_flg)
+      .map(todo => deleteTodo(todo.id));
 
-   // 物理的に削除する関数
-   const handleEmpty = () => {
-    setTodos((todos) => todos.filter((todo) => !todo.delete_flg));
+    Promise.all(deletePromises).then(() => setTodos(filteredTodos));
   };
 
+  // フィルター適用済みTodoリストを取得
+  const getFilteredTodos = () => {
+    switch (filter) {
+      case 'completed':
+        return todos.filter(todo => todo.completed_flg && !todo.delete_flg);
+      case 'unchecked':
+        return todos.filter(todo => !todo.completed_flg && !todo.delete_flg);
+      case 'delete':
+        return todos.filter(todo => todo.delete_flg);
+      default:
+        return todos.filter(todo => !todo.delete_flg);
+    }
+  };
 
- return (
+  const handleFilterChange = (filter: Filter) => {
+    setFilter(filter);
+  };
+
+  return (
     <div className="todo-container">
       <select
         defaultValue="all"
@@ -139,13 +95,10 @@ const Todo: React.FC = () => {
         <option value="unchecked">現在のタスク</option>
         <option value="delete">ごみ箱</option>
       </select>
-      {/* フィルターが `delete` のときは「ごみ箱を空にする」ボタンを表示 */}
+
       {filter === 'delete' ? (
-        <button onClick={handleEmpty}>
-          ごみ箱を空にする
-        </button>
+        <button onClick={handleEmpty}>ごみ箱を空にする</button>
       ) : (
-        // フィルターが `completed` でなければ Todo 入力フォームを表示
         filter !== 'completed' && (
           <form
             onSubmit={(e) => {
@@ -155,13 +108,15 @@ const Todo: React.FC = () => {
           >
             <input
               type="text"
-              value={text} // フォームの入力値をステートにバインド
-              onChange={(e) => setText(e.target.value)} // 入力値が変わった時にステートを更新
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              disabled={isFormDisabled}
             />
-            <button type="submit">追加</button>
+            <button type="submit" disabled={isFormDisabled}>追加</button>
           </form>
         )
       )}
+
       <ul>
         {getFilteredTodos().map((todo) => (
           <li key={todo.id}>
@@ -173,8 +128,8 @@ const Todo: React.FC = () => {
             />
             <input
               type="text"
-              disabled={todo.completed_flg || todo.delete_flg}
               value={todo.content}
+              disabled={todo.completed_flg || todo.delete_flg}
               onChange={(e) => handleTodo(todo.id, 'content', e.target.value)}
             />
             <button onClick={() => handleTodo(todo.id, 'delete_flg', !todo.delete_flg)}>
@@ -185,6 +140,6 @@ const Todo: React.FC = () => {
       </ul>
     </div>
   );
-  };
-  
-  export default Todo;
+};
+
+export default Todo;
